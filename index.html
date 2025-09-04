@@ -1,0 +1,397 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskBuddy - Apple-Inspired Todo App</title>
+    <link href="https://fonts.cdnfonts.com/css/sf-pro-display" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #FFF8F0 0%, #FFE5E5 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 24px;
+        }
+        #app-container {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+            max-width: 700px;
+            width: 100%;
+            animation: slideIn 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.98); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; transform: scale(1); }
+            to { opacity: 0; transform: scale(0.98); }
+        }
+        @keyframes fall {
+            0% { transform: translateY(-15vh) rotate(0deg); }
+            100% { transform: translateY(100vh) rotate(1080deg); }
+        }
+        .confetti {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        .confetti div {
+            position: absolute;
+            width: 5px;
+            height: 5px;
+            background: #F59E0B;
+            opacity: 0.8;
+            animation: fall 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        }
+        .task-item {
+            transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+            border-radius: 12px;
+        }
+        .task-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+        }
+        .task-item.completed {
+            background-color: #ECFDF5;
+            animation: pulse 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+            100% { transform: scale(1); }
+        }
+        .task-item.removing {
+            animation: fadeOut 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #F59E0B;
+            color: #1F2937;
+            padding: 12px 24px;
+            border-radius: 10px;
+            opacity: 0;
+            animation: toastIn 0.4s cubic-bezier(0.25, 1, 0.5, 1) forwards, toastOut 0.4s cubic-bezier(0.25, 1, 0.5, 1) 2s forwards;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes toastOut {
+            to { opacity: 0; transform: translateY(20px); }
+        }
+        .spinner {
+            display: none;
+            border: 3px solid #E5E7EB;
+            border-top: 3px solid #F59E0B;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 0.7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            margin-left: 8px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="app-container">
+        <h1 class="text-2xl font-semibold text-gray-900 mb-6 flex items-center gap-3">
+            <i class="fas fa-check-circle text-amber-500"></i> TaskBuddy
+        </h1>
+        <div id="task-input-container" class="flex flex-col sm:flex-row gap-3 mb-6 bg-white/50 p-4 rounded-xl border border-gray-100">
+            <input type="text" id="task-input" placeholder="Add a task..." required autofocus
+                   class="flex-1 p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none bg-white/70">
+            <input type="datetime-local" id="task-date" title="Set due date and time"
+                   class="p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none bg-white/70">
+            <select id="task-category" title="Choose a category"
+                    class="p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none bg-white/70">
+                <option value="Work">Work</option>
+                <option value="Personal">Personal</option>
+                <option value="Urgent">Urgent</option>
+                <option value="Other">Other</option>
+            </select>
+            <button id="add-task-btn" class="bg-amber-500 text-white px-4 py-3 rounded-lg hover:bg-amber-600 transition transform hover:-translate-y-0.5 hover:shadow-md flex items-center gap-2">
+                <i class="fas fa-plus"></i> Add <span id="add-spinner" class="spinner"></span>
+            </button>
+        </div>
+        <div id="controls" class="flex flex-col sm:flex-row justify-between items-center mb-6">
+            <div class="flex gap-3">
+                <select id="filter" class="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-400 bg-white/70">
+                    <option value="all">All Tasks</option>
+                    <option value="completed">Completed</option>
+                    <option value="pending">Pending</option>
+                </select>
+                <select id="sort" class="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-400 bg-white/70">
+                    <option value="date-asc">Date: Earliest</option>
+                    <option value="date-desc">Date: Latest</option>
+                    <option value="text-asc">Name: A-Z</option>
+                    <option value="text-desc">Name: Z-A</option>
+                </select>
+            </div>
+            <button id="clear-all-btn" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition transform hover:-translate-y-0.5 hover:shadow-md hidden">
+                Clear All <span id="clear-spinner" class="spinner"></span>
+            </button>
+        </div>
+        <ul id="task-list" class="max-h-96 overflow-y-auto pr-2"></ul>
+    </div>
+    <div class="confetti" id="confetti"></div>
+
+    <script>
+        const taskInput = document.getElementById('task-input');
+        const taskDate = document.getElementById('task-date');
+        const taskCategory = document.getElementById('task-category');
+        const addTaskBtn = document.getElementById('add-task-btn');
+        const addSpinner = document.getElementById('add-spinner');
+        const taskList = document.getElementById('task-list');
+        const clearAllBtn = document.getElementById('clear-all-btn');
+        const clearSpinner = document.getElementById('clear-spinner');
+        const filter = document.getElementById('filter');
+        const sort = document.getElementById('sort');
+        let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+
+        // Save tasks to local storage
+        function saveTasks() {
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+            toggleClearAllBtn();
+            renderTasks();
+        }
+
+        // Toggle visibility of Clear All button
+        function toggleClearAllBtn() {
+            clearAllBtn.classList.toggle('hidden', tasks.length === 0);
+        }
+
+        // Render tasks with filtering and sorting
+        function renderTasks() {
+            let filteredTasks = [...tasks];
+            const filterValue = filter.value;
+            if (filterValue === 'completed') {
+                filteredTasks = filteredTasks.filter(task => task.completed);
+            } else if (filterValue === 'pending') {
+                filteredTasks = filteredTasks.filter(task => !task.completed);
+            }
+
+            const sortValue = sort.value;
+            filteredTasks.sort((a, b) => {
+                if (sortValue === 'date-asc') {
+                    return (a.date || '9999-12-31') > (b.date || '9999-12-31') ? 1 : -1;
+                } else if (sortValue === 'date-desc') {
+                    return (a.date || '9999-12-31') < (b.date || '9999-12-31') ? 1 : -1;
+                } else if (sortValue === 'text-asc') {
+                    return a.text.localeCompare(b.text);
+                } else {
+                    return b.text.localeCompare(a.text);
+                }
+            });
+
+            taskList.innerHTML = '';
+            filteredTasks.forEach((task, index) => {
+                const li = document.createElement('li');
+                li.className = `task-item flex items-center p-4 mb-3 border border-gray-100 shadow-sm bg-white/70 rounded-12 animate-[fadeIn_0.3s_cubic-bezier(0.25,1,0.5,1)] ${task.completed ? 'completed' : ''}`;
+                li.innerHTML = `
+                    <input type="checkbox" class="task-checkbox w-5 h-5 text-teal-500 border-gray-200 rounded focus:ring-teal-400" ${task.completed ? 'checked' : ''}>
+                    <div class="flex-1 ml-3">
+                        <span class="task-text font-medium text-gray-900 ${task.completed ? 'line-through text-gray-500' : ''}">${task.text}</span>
+                        <div class="flex gap-3 text-xs text-gray-500 mt-1">
+                            ${task.date ? `<span class="task-date">${new Date(task.date).toLocaleString()}</span>` : ''}
+                            <span class="task-category px-2 py-1 bg-amber-100 text-amber-700 rounded">${task.category}</span>
+                        </div>
+                    </div>
+                    <div class="task-actions flex gap-2">
+                        <button class="edit-btn text-teal-500 hover:text-teal-600" title="Edit Task"><i class="fas fa-pen"></i></button>
+                        <button class="delete-btn text-red-500 hover:text-red-600" title="Delete Task"><i class="fas fa-trash"></i></button>
+                    </div>
+                `;
+                li.querySelector('.task-checkbox').addEventListener('change', () => toggleComplete(index));
+                li.querySelector('.edit-btn').addEventListener('click', () => editTask(index));
+                li.querySelector('.delete-btn').addEventListener('click', () => deleteTask(index));
+                taskList.appendChild(li);
+            });
+            toggleClearAllBtn();
+        }
+
+        // Show toast notification
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2400);
+        }
+
+        // Add a new task
+        function addTask() {
+            const text = taskInput.value.trim();
+            const date = taskDate.value;
+            const category = taskCategory.value;
+            if (!text) {
+                showToast('Please enter a task.');
+                return;
+            }
+            addSpinner.style.display = 'inline-block';
+            addTaskBtn.disabled = true;
+            setTimeout(() => {
+                tasks.push({
+                    text,
+                    date,
+                    category,
+                    completed: false
+                });
+                taskInput.value = '';
+                taskDate.value = '';
+                taskCategory.value = 'Work';
+                saveTasks();
+                addSpinner.style.display = 'none';
+                addTaskBtn.disabled = false;
+                showToast('Task added!');
+                taskInput.focus();
+            }, 200);
+        }
+
+        // Toggle task completion
+        function toggleComplete(index) {
+            tasks[index].completed = !tasks[index].completed;
+            if (tasks[index].completed) {
+                triggerConfetti();
+                showToast('Task completed! 🎉');
+            } else {
+                showToast('Task marked as pending.');
+            }
+            saveTasks();
+        }
+
+        // Edit a task
+        function editTask(index) {
+            const task = tasks[index];
+            const newText = prompt('Edit task:', task.text);
+            if (newText !== null && newText.trim()) {
+                tasks[index].text = newText.trim();
+                const newDate = prompt('Edit date and time (YYYY-MM-DDTHH:MM or leave blank):', task.date || '');
+                tasks[index].date = newDate || '';
+                const newCategory = prompt('Edit category (Work/Personal/Urgent/Other):', task.category);
+                if (newCategory && ['Work', 'Personal', 'Urgent', 'Other'].includes(newCategory)) {
+                    tasks[index].category = newCategory;
+                }
+                saveTasks();
+                showToast('Task updated!');
+            }
+        }
+
+        // Delete a task
+        function deleteTask(index) {
+            if (index >= tasks.length) return; // Safeguard against invalid index
+            if (confirm('Delete this task?')) {
+                const deletedTask = tasks[index].text;
+                const taskElement = taskList.children[filteredIndexToTaskIndex(index)];
+                if (taskElement) {
+                    taskElement.classList.add('removing');
+                    setTimeout(() => {
+                        tasks.splice(index, 1);
+                        saveTasks();
+                        showToast(`Task "${deletedTask}" deleted!`);
+                    }, 300);
+                } else {
+                    tasks.splice(index, 1);
+                    saveTasks();
+                    showToast(`Task "${deletedTask}" deleted!`);
+                }
+            }
+        }
+
+        // Map filtered index to actual task index
+        function filteredIndexToTaskIndex(filteredIndex) {
+            let filteredTasks = [...tasks];
+            const filterValue = filter.value;
+            if (filterValue === 'completed') {
+                filteredTasks = filteredTasks.filter(task => task.completed);
+            } else if (filterValue === 'pending') {
+                filteredTasks = filteredTasks.filter(task => !task.completed);
+            }
+            const sortValue = sort.value;
+            filteredTasks.sort((a, b) => {
+                if (sortValue === 'date-asc') {
+                    return (a.date || '9999-12-31') > (b.date || '9999-12-31') ? 1 : -1;
+                } else if (sortValue === 'date-desc') {
+                    return (a.date || '9999-12-31') < (b.date || '9999-12-31') ? 1 : -1;
+                } else if (sortValue === 'text-asc') {
+                    return a.text.localeCompare(b.text);
+                } else {
+                    return b.text.localeCompare(a.text);
+                }
+            });
+            const task = filteredTasks[filteredIndex];
+            return tasks.findIndex(t => t.text === task.text && t.date === task.date && t.category === task.category);
+        }
+
+        // Clear all tasks
+        function clearAllTasks() {
+            if (confirm('Clear all tasks?')) {
+                clearSpinner.style.display = 'inline-block';
+                clearAllBtn.disabled = true;
+                const taskItems = taskList.querySelectorAll('.task-item');
+                taskItems.forEach(item => item.classList.add('removing'));
+                setTimeout(() => {
+                    tasks = [];
+                    saveTasks();
+                    clearSpinner.style.display = 'none';
+                    clearAllBtn.disabled = false;
+                    showToast('All tasks cleared!');
+                }, 300);
+            }
+        }
+
+        // Trigger confetti animation
+        function triggerConfetti() {
+            const confettiContainer = document.getElementById('confetti');
+            const colors = ['#F59E0B', '#14B8A6', '#F43F5E', '#6EE7B7'];
+            for (let i = 0; i < 80; i++) {
+                const confetti = document.createElement('div');
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.animationDelay = Math.random() * 1 + 's';
+                confetti.style.width = Math.random() * 4 + 3 + 'px';
+                confetti.style.height = Math.random() * 4 + 3 + 'px';
+                confettiContainer.appendChild(confetti);
+            }
+            setTimeout(() => confettiContainer.innerHTML = '', 2500);
+        }
+
+        // Event listeners
+        addTaskBtn.addEventListener('click', addTask);
+        taskInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addTask();
+        });
+        clearAllBtn.addEventListener('click', clearAllTasks);
+        filter.addEventListener('change', renderTasks);
+        sort.addEventListener('change', renderTasks);
+
+        // Initial render and focus
+        renderTasks();
+        taskInput.focus();
+    </script>
+</body>
+</html>
+```
